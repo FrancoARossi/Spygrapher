@@ -2,6 +2,8 @@ import pyautogui, pyscreeze, time, os, zipfile, sys
 
 ''' Thing to do in order of importance'''
 
+'''TODO line 10 and 11: use os.walk to grab the path of the data and sources subdirectories
+		 to create the data_dir and sources_dir from os.path.join() for compatibility'''
 #TODO if a folder doesn't exist, create it
 #TODO implement email attachments
 
@@ -40,8 +42,8 @@ if __name__ == '__main__':
 		try:
 			i = i % len(source_files)
 			if i < len(source_files):
-				pyautogui.locateOnScreen(sources_dir + source_files[i], confidence = 0.9) # Locate the image on screen with a confidence of 90%
-				takeScreenshots(10, 0.5) # When it's located take 10 screenshots with a interval of 4 seconds
+				pyautogui.locateOnScreen(os.path.join(sources_dir, source_files[i]), confidence = 0.9) # Locate the image on screen with a confidence of 90%
+				takeScreenshots(10, 4) # When it's located take 10 screenshots with a interval of 4 seconds
 				createZip()
 				deleteImages()
 		except pyscreeze.ImageNotFoundException:
