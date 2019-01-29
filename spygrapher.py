@@ -17,7 +17,8 @@ def createZip():
 	zip_file = zipfile.ZipFile(current_path + '/compressed_data/images_' + date_time + '.zip', mode='w', compression=zipfile.ZIP_DEFLATED)
 	data_dir = current_path + '/data/'
 	for file in os.listdir(data_dir):
-		zip_file.write(os.path.join(data_dir, file))
+		if file.endswith('.png'):
+			zip_file.write(os.path.join(data_dir, file))
 	zip_file.close()
 
 def takeScreenshots(amount, interval):
@@ -28,7 +29,6 @@ def takeScreenshots(amount, interval):
 
 if __name__ == '__main__':
 	while True:
-		print(current_path)
 		try:
 			pyautogui.locateOnScreen(current_path +'/sources/google_logo_1.png', confidence = 0.9) # Locate the image on screen with a confidence of 90%
 			takeScreenshots(10, 4) # When it's located take 10 screenshots with a interval of 4 seconds
