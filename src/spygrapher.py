@@ -36,7 +36,8 @@ def createZip():
 def takeScreenshots(amount, interval):
 	for i in range(0, amount):
 		date_time = getCurrentDateTime()
-		pyautogui.screenshot(dir.screenshots + 'image' + str(i + 1) + '_' + date_time +'.png')
+		screenshot_name = 'image' + str(i + 1) + '_' + date_time + '.png'
+		pyautogui.screenshot(os.path.join(dir.screenshots, screenshot_name))
 		time.sleep(interval)
 
 def checkFindImages():
