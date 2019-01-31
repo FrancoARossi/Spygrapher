@@ -41,7 +41,7 @@ def takeScreenshots(amount, interval):
 		time.sleep(interval)
 
 def checkFindImages():
-	return [file for file in os.listdir(dir.find) if file.endswith('.png') or file.endswith('.jpg')]		
+	return [file for file in os.listdir(dir.find) if file.endswith('.png')]		
 
 def checkFolders():
 	for k in range(0, 3):
@@ -57,9 +57,11 @@ if __name__ == '__main__':
 	dir = Directories()
 	i = 0
 	find_images = []
+	amount, interval = 10, 3 # takeScreenshots arguments
 
 	checkFolders()
 
+	print('Searching...\n')
 	while True:
 		try:
 			if find_images != checkFindImages():
@@ -68,16 +70,21 @@ if __name__ == '__main__':
 				time.sleep(1)
 				print('Searching...\n')
 			i = i % len(find_images)
-			pyautogui.locateOnScreen(os.path.join(dir.find, find_images[i]), confidence = 0.9) # find the image on screen with a confidence of 90%
-			takeScreenshots(10, 3) # When it's found take 10 screenshots with a interval of 3 seconds
+			pyautogui.locateOnScreen(os.path.join(dir.find, find_images[i]), confidence = 0.9)
+			print('Image found!')
+			print('Taking screenshots, this process will take ' + str(amount*interval) + ' seconds')
+			takeScreenshots(amount, interval)
+			print('Creating compressed file')
 			createZip()
+			print('Deleting screenshots')
 			deleteImages()
+			print('\nSearching...\n')
 		except pyscreeze.ImageNotFoundException:
 			time.sleep(1)
 			i += 1
 		except ZeroDivisionError:
-			print('Error: The find folder does not containg any image to look for.\n')
-			print('Please insert at least one .png or .jpg in the find folder. The folder has been created in the same directory as this script.')
+			print('The find folder does not containg any image to look for.\n')
+			print('Please insert at least one .png in the find folder. The folder has been created in the same directory as this script.')
 			while len(find_images) == 0:
 				time.sleep(2)
 				find_images = checkFindImages()
