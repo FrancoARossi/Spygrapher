@@ -10,9 +10,9 @@ class Directories(object):
 	__slots__ = ['current' ,'find', 'screenshots', 'compressed']
 	def __init__(self):
 		self.current = os.path.dirname(os.path.realpath(__file__))
-		self.find = self.current + '/find/'
-		self.screenshots = self.current + '/screenshots/'
-		self.compressed = self.current + '/compressed/'
+		self.find = os.path.join(self.current, 'find')
+		self.screenshots = os.path.join(self.current, 'screenshots')
+		self.compressed = os.path.join(self.current, 'compressed')
 
 def getCurrentDateTime():
 	current_date_time = time.localtime()
@@ -26,7 +26,8 @@ def deleteImages():
 
 def createZip():
 	date_time = getCurrentDateTime()
-	zip_file = zipfile.ZipFile(dir.compressed + 'images_' + date_time + '.zip', mode='w', compression=zipfile.ZIP_DEFLATED)
+	zip_name = 'images_' + date_time + '.zip'
+	zip_file = zipfile.ZipFile(os.path.join(dir.compressed, zip_name), mode='w', compression=zipfile.ZIP_DEFLATED)
 	for file in os.listdir(dir.screenshots):
 		if file.endswith('.png'):
 			zip_file.write(os.path.join(dir.screenshots, file))
