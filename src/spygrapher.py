@@ -84,13 +84,12 @@ def checkFindImages():
 	return [file for file in os.listdir(dir.find) if file.endswith('.png')]		
 
 def checkFolders():
-	for k in range(0, 3):
-		if not os.path.exists(dir.find):
-			os.mkdir('find')
-		elif not os.path.exists(dir.screenshots):
-			os.mkdir('screenshots')
-		elif not os.path.exists(dir.compressed):
-			os.mkdir('compressed')
+	if not os.path.exists(dir.find):
+		os.mkdir('find')
+	if not os.path.exists(dir.screenshots):
+		os.mkdir('screenshots')
+	if not os.path.exists(dir.compressed):
+		os.mkdir('compressed')
 
 ### MAIN ###
 
