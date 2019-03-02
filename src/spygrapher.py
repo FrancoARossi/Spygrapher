@@ -1,4 +1,5 @@
-import time, os
+import time, os, sys
+import argparse
 import pyautogui, pyscreeze
 import zipfile
 import smtplib
@@ -20,7 +21,7 @@ def getCurrentDateTime():
 	formatted_time = time.strftime('%Y%m%d-%H%M%S', current_date_time)
 	return formatted_time
 
-def sendMail(zip_name, user_email, user_password, receiving_email):
+def sendMail(zip_name, server, user_email, user_password, receiving_email):
 	email_from = user_email
 	email_password = user_password
 	email_to = receiving_email
@@ -41,17 +42,13 @@ def sendMail(zip_name, user_email, user_password, receiving_email):
 	att = MIMEBase('application', 'octet-stream') # Creating encoder object
 	att.set_payload(attachment.read()) # Attaching file to the encoder
 	encoders.encode_base64(att) # Setting the encoder to base 64
-	att.add_header('Content-Disposition', "attachment; filename = " + file_dir) # Adding headers
+	att.add_header('Content-Disposition', "attachment; filename = " + file_dir) # Adding file to header
 
 	mail.attach(att) # Attaching encoder with file to mail
 	text = mail.as_string() # Getting the text content from the mail as a string
-	server = smtplib.SMTP('smtp.gmail.com', 587) # Initializing gmail server connection (if you're not using gmail then search your mail's provider smtp server and port)
-	server.starttls() # Starting secure connection
-	server.login(email_from, email_password) # Logging into your email
 
 	server.sendmail(email_from, email_to, text) # Sending mail
 	attachment.close() # Closing file
-	server.quit() # Closing server connection
 
 def deleteFrom(folder):
 	if folder == 'screenshots':
@@ -91,15 +88,32 @@ def checkFolders():
 	if not os.path.exists(dir.compressed):
 		os.mkdir('compressed')
 
-### MAIN ###
+def getArguments():
+	parser = argparse.ArgumentParser(description="Email info parser")
+	parser.add_argument('user_email', help="Email sender account", type=str)
+	parser.add_argument('user_password', help="Email sender account's password", type=str)
+	parser.add_argument('receiving_email', help="Email receiving account (it can be the same as the sender)", type=str)
+
+	args = parser.parse_args()
+
+	return args.user_email, args.user_password, args.receiving_email
 
 if __name__ == '__main__':
 
-	# USER
-	amount, interval = 10, 3 # takeScreenshots arguments
-	user_email = 'your_email@gmail.com' # Your email
-	user_password = 'your_password' # Your email's password
-	receiving_email = 'receiving_email@gmail.com' # You can use the same email as email_from to receive the mails yourself
+	amount, interval = 10, 2 # takeScreenshots arguments
+	user_email , user_password, receiving_email = getArguments()
+
+	try:
+		print("Starting server connection")
+		server = smtplib.SMTP('smtp.gmail.com', 587) # Initializing gmail server connection (if you're not using gmail then search your mail's provider smtp server and port)
+		server.ehlo_or_helo_if_needed() # Annoucing conection
+		server.starttls() # Starting secure conection
+		server.login(user_email, user_password) # Logging into user account
+	except smtplib.SMTPAuthenticationError:
+		print('Error: Cannot login into the user account.')
+		print("This may occur because the email and password does not match a existing account or the ' allow less-secure apps' option of your gmail account is disabled.")
+		server.quit()
+		sys.exit()
 
 	dir = Directories()
 	i = 0
@@ -116,7 +130,7 @@ if __name__ == '__main__':
 				time.sleep(1)
 				print('Searching...\n')
 			i = i % len(find_images)
-			pyautogui.locateOnScreen(os.path.join(dir.find, find_images[i]), confidence = 0.9)
+			pyautogui.locateOnScreen(os.path.join(dir.find, find_images[i]), confidence = 0.85)
 			print('Image found!')
 			print('Taking screenshots, this process will take ' + str(amount*interval) + ' seconds')
 			takeScreenshots(amount, interval)
@@ -125,7 +139,7 @@ if __name__ == '__main__':
 			print('Deleting screenshots')
 			deleteFrom('screenshots')
 			print('Sending Email...')
-			sendMail(zip_name, user_email, user_password, receiving_email)
+			sendMail(zip_name, server, user_email, user_password, receiving_email)
 			print('Deleting compressed file')
 			deleteFrom('compressed')
 			print('Done!')
@@ -134,7 +148,7 @@ if __name__ == '__main__':
 			time.sleep(1)
 			i += 1
 		except ZeroDivisionError:
-			print('The find folder does not containg any image to look for.\n')
+			print('Error: The find folder does not containg any image to look for.')
 			print('Please insert at least one .png in the find folder. The folder has been created in the same directory as this script.')
 			while len(find_images) == 0:
 				time.sleep(2)
@@ -142,7 +156,8 @@ if __name__ == '__main__':
 			print('\n' + str(len(find_images)) + ' image/s found!\n')
 			print('Searching...\n')
 		except OSError:
-			print('Error (on find folder): The software does not have permission to load the image or it has an unsupported name.')
+			print('Error: The software does not have permission to load the image or it has an unsupported name.')
 			print('Accents are not supported.\n')
 			time.sleep(2)
 			break
+	server.quit()
