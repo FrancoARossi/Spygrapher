@@ -1,0 +1,6 @@
+Python 3
+
+Modules:
+- pyautogui
+- pyscreeze
+- opencv-python
