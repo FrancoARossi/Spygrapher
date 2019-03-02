@@ -1,4 +1,4 @@
-# spygrapher
+# Spygrapher
 A spyware that takes a series of screenshots then it compress them and finally sends them via email. Software built for educational purpouses.
 
 DISCLAIMER:
