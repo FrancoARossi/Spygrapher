@@ -1,12 +1,15 @@
 import time, os, sys
-import argparse
 import pyautogui, pyscreeze
 import zipfile
 import smtplib
+import argparse
+from socket import gaierror
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
+
+#TODO: Add Threading
 
 class Directories(object):
 	__slots__ = ['current' ,'find', 'screenshots', 'compressed']
@@ -90,30 +93,43 @@ def checkFolders():
 
 def getArguments():
 	parser = argparse.ArgumentParser(description="Email info parser")
-	parser.add_argument('user_email', help="Email sender account", type=str)
-	parser.add_argument('user_password', help="Email sender account's password", type=str)
-	parser.add_argument('receiving_email', help="Email receiving account (it can be the same as the sender)", type=str)
+	parser.add_argument('-u' ,'--user_email', help="Email sender account", type=str)
+	parser.add_argument('-p' ,'--user_password', help="Password of the email sender account", type=str)
+	parser.add_argument('-r' ,'--receiving_email', help="Email receiving account (it can be the same as the sender)", type=str)
+	parser.add_argument('-o', '--offline', help='Disable the email part of the script so -u, -p and -r are not required', action='store_true')
 
 	args = parser.parse_args()
 
-	return args.user_email, args.user_password, args.receiving_email
+	return args.user_email, args.user_password, args.receiving_email, args.offline
 
 if __name__ == '__main__':
 
 	amount, interval = 10, 2 # takeScreenshots arguments
-	user_email , user_password, receiving_email = getArguments()
+	user_email , user_password, receiving_email, offline = getArguments()
 
-	try:
-		print("Starting server connection")
-		server = smtplib.SMTP('smtp.gmail.com', 587) # Initializing gmail server connection (if you're not using gmail then search your mail's provider smtp server and port)
-		server.ehlo_or_helo_if_needed() # Annoucing conection
-		server.starttls() # Starting secure conection
-		server.login(user_email, user_password) # Logging into user account
-	except smtplib.SMTPAuthenticationError:
-		print('Error: Cannot login into the user account.')
-		print("This may occur because the email and password does not match a existing account or the ' allow less-secure apps' option of your gmail account is disabled.")
-		server.quit()
-		sys.exit()
+	if not offline:
+		try:
+			print("Starting server connection")
+			server = smtplib.SMTP('smtp.gmail.com', 587) # Initializing gmail server connection (if you're not using gmail then search your mail's provider smtp server and port)
+			server.ehlo_or_helo_if_needed() # Annoucing connection
+			server.starttls() # Starting secure connection
+			print("Logging in")
+			server.login(user_email, user_password) # Logging into user account
+			print("Logged!")
+		except smtplib.SMTPAuthenticationError:
+			print('Error: Cannot login into the user account.')
+			print("This may occur because the email and password does not match a existing account or the 'allow less-secure apps' option of your gmail account is disabled.")
+			server.quit()
+			sys.exit()
+		except AttributeError:
+			print('No user email, user password and/or receiver email was given.')
+			print('By default the script needs those argument to send the images via email.')
+			print("If you don't want to send them via email use the -o | --offline argument (-h for help).")
+			server.quit()
+			sys.exit()
+		except gaierror:
+			print("\nCant reach server address.")
+			sys.exit()
 
 	dir = Directories()
 	i = 0
@@ -138,10 +154,11 @@ if __name__ == '__main__':
 			zip_name = createZip()
 			print('Deleting screenshots')
 			deleteFrom('screenshots')
-			print('Sending Email...')
-			sendMail(zip_name, server, user_email, user_password, receiving_email)
-			print('Deleting compressed file')
-			deleteFrom('compressed')
+			if not offline:
+				print('Sending Email...')
+				sendMail(zip_name, server, user_email, user_password, receiving_email)
+				print('Deleting compressed file')
+				deleteFrom('compressed')
 			print('Done!')
 			print('\nSearching...\n')
 		except pyscreeze.ImageNotFoundException:
@@ -158,6 +175,6 @@ if __name__ == '__main__':
 		except OSError:
 			print('Error: The software does not have permission to load the image or it has an unsupported name.')
 			print('Accents are not supported.\n')
-			time.sleep(2)
 			break
-	server.quit()
+	if not offline:
+		server.quit()
