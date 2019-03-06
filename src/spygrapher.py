@@ -3,6 +3,7 @@ import pyautogui, pyscreeze
 import zipfile
 import smtplib
 import argparse
+import threading
 from socket import gaierror
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -24,7 +25,18 @@ def getCurrentDateTime():
 	formatted_time = time.strftime('%Y%m%d-%H%M%S', current_date_time)
 	return formatted_time
 
+def deleteFrom(folder):
+	if folder == 'screenshots':
+		for file in os.listdir(dir.screenshots):
+			if file.endswith('.png'):
+				os.remove(os.path.join(dir.screenshots, file))
+	elif folder == 'compressed':
+		for file in os.listdir(dir.compressed):
+			if file.endswith('.zip'):
+				os.remove(os.path.join(dir.compressed, file))
+
 def sendMail(zip_name, server, user_email, user_password, receiving_email):
+	tLock.acquire()
 	email_from = user_email
 	email_password = user_password
 	email_to = receiving_email
@@ -52,16 +64,9 @@ def sendMail(zip_name, server, user_email, user_password, receiving_email):
 
 	server.sendmail(email_from, email_to, text) # Sending mail
 	attachment.close() # Closing file
-
-def deleteFrom(folder):
-	if folder == 'screenshots':
-		for file in os.listdir(dir.screenshots):
-			if file.endswith('.png'):
-				os.remove(os.path.join(dir.screenshots, file))
-	elif folder == 'compressed':
-		for file in os.listdir(dir.compressed):
-			if file.endswith('.zip'):
-				os.remove(os.path.join(dir.compressed, file))
+	print('Deleting compressed file')
+	deleteFrom('compressed')
+	tLock.release()
 
 def createZip():
 	date_time = getCurrentDateTime()
@@ -96,40 +101,44 @@ def getArguments():
 	parser.add_argument('-u' ,'--user_email', help="Email sender account", type=str)
 	parser.add_argument('-p' ,'--user_password', help="Password of the email sender account", type=str)
 	parser.add_argument('-r' ,'--receiving_email', help="Email receiving account (it can be the same as the sender)", type=str)
-	parser.add_argument('-o', '--offline', help='Disable the email part of the script so -u, -p and -r are not required', action='store_true')
+	parser.add_argument('-o', '--offlineMode', help='Disable the email part of the script so -u, -p and -r are not required', action='store_true')
 
 	args = parser.parse_args()
 
-	return args.user_email, args.user_password, args.receiving_email, args.offline
+	return args.user_email, args.user_password, args.receiving_email, args.offlineMode
+
+def startServerConnection():
+	try:
+		print("Starting server connection")
+		server = smtplib.SMTP('smtp.gmail.com', 587) # Initializing gmail server connection (if you're not using gmail then search your mail's provider smtp server and port)
+		server.ehlo_or_helo_if_needed() # Annoucing connection
+		server.starttls() # Starting secure connection
+		print("Logging in")
+		server.login(user_email, user_password) # Logging into user account
+		print("Logged!")
+		return server
+	except smtplib.SMTPAuthenticationError:
+		print('Error: Cannot login into the user account.')
+		print("This may occur because the email and password does not match a existing account or the 'allow less-secure apps' option of your gmail account is disabled.")
+		server.quit()
+		sys.exit()
+	except AttributeError:
+		print('No user email, user password and/or receiver email was given.')
+		print('By default the script needs those argument to send the images via email.')
+		print("If you don't want to send them via email use the -o | --offlineMode argument (-h for help).")
+		server.quit()
+		sys.exit()
+	except gaierror:
+		print("\nCant reach server address.")
+		sys.exit()
 
 if __name__ == '__main__':
 
 	amount, interval = 10, 2 # takeScreenshots arguments
-	user_email , user_password, receiving_email, offline = getArguments()
+	user_email , user_password, receiving_email, offlineMode = getArguments()
 
-	if not offline:
-		try:
-			print("Starting server connection")
-			server = smtplib.SMTP('smtp.gmail.com', 587) # Initializing gmail server connection (if you're not using gmail then search your mail's provider smtp server and port)
-			server.ehlo_or_helo_if_needed() # Annoucing connection
-			server.starttls() # Starting secure connection
-			print("Logging in")
-			server.login(user_email, user_password) # Logging into user account
-			print("Logged!")
-		except smtplib.SMTPAuthenticationError:
-			print('Error: Cannot login into the user account.')
-			print("This may occur because the email and password does not match a existing account or the 'allow less-secure apps' option of your gmail account is disabled.")
-			server.quit()
-			sys.exit()
-		except AttributeError:
-			print('No user email, user password and/or receiver email was given.')
-			print('By default the script needs those argument to send the images via email.')
-			print("If you don't want to send them via email use the -o | --offline argument (-h for help).")
-			server.quit()
-			sys.exit()
-		except gaierror:
-			print("\nCant reach server address.")
-			sys.exit()
+	if not offlineMode:
+		server = startServerConnection()
 
 	dir = Directories()
 	i = 0
@@ -154,15 +163,14 @@ if __name__ == '__main__':
 			zip_name = createZip()
 			print('Deleting screenshots')
 			deleteFrom('screenshots')
-			if not offline:
-				print('Sending Email...')
-				sendMail(zip_name, server, user_email, user_password, receiving_email)
-				print('Deleting compressed file')
-				deleteFrom('compressed')
-			print('Done!')
+			if not offlineMode:
+				print('Sending Email, this process will take about 7 seconds')
+				tLock = threading.Lock()
+				emailThread = threading.Thread(target=sendMail, args=(zip_name, server, user_email, user_password, receiving_email))
+				emailThread.start()
 			print('\nSearching...\n')
 		except pyscreeze.ImageNotFoundException:
-			time.sleep(1)
+			time.sleep(0.5)
 			i += 1
 		except ZeroDivisionError:
 			print('Error: The find folder does not containg any image to look for.')
@@ -176,5 +184,5 @@ if __name__ == '__main__':
 			print('Error: The software does not have permission to load the image or it has an unsupported name.')
 			print('Accents are not supported.\n')
 			break
-	if not offline:
+	if not offlineMode:
 		server.quit()
